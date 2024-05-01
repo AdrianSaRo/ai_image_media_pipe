@@ -4,16 +4,18 @@ import Layout from '../layouts/Layout.astro';
 
 <Layout title="Welcome to Astro.">
 	<main class="w-full h-screen flex flex-col items-center">
-		<h1 class="text-center">Cat and Dog AI detection.</h1>
+		<h1 class="text-center text-lg">AI detection.</h1>
 		<input id="inputImage" type="file" accept="image/*" class="file-input file-input-bordered file-input-sm w-full max-w-xs my-2 text-center" />
 		<img class="my-2" id="imgPreview">
 		<p id="errorMsg" class="text-red-600 hidden" />
 		<button id="scannBtn" class="btn btn-wide hidden">SCANN</button>
+		<div class="flex justify-center gap-2 flex-wrap p-3" id=progress></div>
 	</main>
 </Layout>
 
 <script>
-	import { ImageSegmenter, ImageSegmenterResult, FilesetResolver, ImageClassifier } from '@mediapipe/tasks-vision'
+	import type { ObjectDetectorResult } from '@mediapipe/tasks-vision';
+import { FilesetResolver, ImageClassifier, ImageSegmenter, ImageSegmenterResult, ObjectDetector } from '@mediapipe/tasks-vision';
 
 	let dogApi = 'https://api.thedogapi.com/v1/breeds';
 	let catApi = 'https://api.thecatapi.com/v1/breeds';
@@ -21,6 +23,7 @@ import Layout from '../layouts/Layout.astro';
 	let runningMode: "IMAGE";
 	let imageSegmenter: ImageSegmenter;
 	let imageClassifier: ImageClassifier;
+	let objectDetector: ObjectDetector;
 	let labels: Array<string>;
 	
 	// Find all buttons with the `alert` class on the page.
@@ -28,6 +31,7 @@ import Layout from '../layouts/Layout.astro';
 	let $scannButton = document.querySelector('#scannBtn') as HTMLElement;
 	let $errorMsg = document.querySelector('#errorMsg') as HTMLElement;
 	let $imgPreview = document.querySelector('#imgPreview') as HTMLImageElement;
+	let $progress = document.querySelector('#progress') as HTMLElement;
 	
 	$input.addEventListener('change', (event) => {
 		previewImage(event);
@@ -67,29 +71,46 @@ import Layout from '../layouts/Layout.astro';
 		}
 		$scannButton?.classList.add('btn-disabled')
 		console.log($imgPreview)
-		imageSegmenter.segment($imgPreview, callback);
+		// imageSegmenter.segment($imgPreview, callback);
+		const detections = objectDetector.detect($imgPreview);
+  		displayImageDetections(detections);
+	}
+
+	const displayImageDetections = ( result: ObjectDetectorResult) => {
+
+		result.detections.forEach((d) => {
+			let percent = Math.round(parseFloat(d.categories[0].score.toString()) * 100)
+			$progress.innerHTML += `<div class="flex items-center flex-col gap-2"><div class="radial-progress" style="--value:${percent};" role="progressbar">${percent}%</div><div>${d.categories[0].categoryName}</div></div>`
+		})
+
+		$scannButton.classList.remove('hidden');
+
 	}
 
 	const callback = async (result: ImageSegmenterResult) => {
-		let category: String = "";
+		let categories: {label: string, value: number}[] = [];
+		labels.forEach((l) => {
+			categories.push({ label: l, value: 0})
+		})
   		const mask = result.categoryMask?.getAsUint8Array();
-		console.log(mask)
 		mask?.forEach((s: any) => {
 			if (s > 0) {
-				category = labels[s];
+				let cat = categories[s]
+				 cat.value = cat.value + 1
 			}
 		})
-		const breed = await classifyImage();
-		console.log(`this is a ${category} of breed ${breed}`)
-		if ( category === 'dog') {
-			$errorMsg.classList.add('hidden')
-		} else if ( category === 'cat') {
-			$errorMsg.classList.add('hidden')
-		}else {
-			$errorMsg.innerText = `this is an ${category} of breed ${breed} and is not a cat or a dog.`
-			$errorMsg.classList.remove('hidden')
-			console.log('No category data')
-		}
+		console.log(categories)
+		// const breed = await classifyImage();
+		// console.log(`this is a ${category} of breed ${breed}`)
+		// if ( category === 'dog') {
+		// 	$errorMsg.classList.add('hidden')
+		// } else if ( category === 'cat') {
+		// 	$errorMsg.classList.add('hidden')
+		// }else {
+		// 	$errorMsg.innerText = `this is an ${category} of breed ${breed} and is not a cat or a dog.`
+		// 	$errorMsg.classList.remove('hidden')
+		// 	console.log('No category data')
+		// }
 		$scannButton.classList.remove('btn-disabled')
 	}
 
@@ -132,7 +153,21 @@ import Layout from '../layouts/Layout.astro';
 		});
 		labels = imageSegmenter.getLabels();
 	};
+	const initializeObjectDetector = async () => {
+		const vision = await FilesetResolver.forVisionTasks(
+			"https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.2/wasm"
+		);
+		objectDetector = await ObjectDetector.createFromOptions(vision, {
+			baseOptions: {
+			modelAssetPath: `https://storage.googleapis.com/mediapipe-models/object_detector/efficientdet_lite0/float16/1/efficientdet_lite0.tflite`,
+			delegate: "GPU"
+			},
+			scoreThreshold: 0.5,
+			runningMode: runningMode
+		});
+	};
 	createImageSegmenter();
 	createImageClassifier();
+	initializeObjectDetector();
 
 </script>
