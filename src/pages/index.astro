@@ -6,10 +6,13 @@ import Layout from '../layouts/Layout.astro';
 	<main class="w-full h-screen flex flex-col items-center">
 		<h1 class="text-center text-lg">AI detection.</h1>
 		<input id="inputImage" type="file" accept="image/*" class="file-input file-input-bordered file-input-sm w-full max-w-xs my-2 text-center" />
-		<img class="my-2" id="imgPreview">
+		<div class="my-2 w-full max-h-60">
+			<img class="max-h-60" id="imgPreview">
+			<div id="skeleton" class="skeleton w-full h-60 hidden"></div>
+		</div>
 		<p id="errorMsg" class="text-red-600 hidden" />
 		<button id="scannBtn" class="btn btn-wide hidden">SCANN</button>
-		<div class="flex justify-center gap-2 flex-wrap p-3" id=progress></div>
+		<div class="flex justify-center gap-2 flex-wrap px-3 py-4" id=progress></div>
 	</main>
 </Layout>
 
@@ -32,6 +35,7 @@ import { FilesetResolver, ImageClassifier, ImageSegmenter, ImageSegmenterResult,
 	let $errorMsg = document.querySelector('#errorMsg') as HTMLElement;
 	let $imgPreview = document.querySelector('#imgPreview') as HTMLImageElement;
 	let $progress = document.querySelector('#progress') as HTMLElement;
+	let $skeleton = document.querySelector('#skeleton') as HTMLElement;
 	
 	$input.addEventListener('change', (event) => {
 		previewImage(event);
@@ -70,19 +74,22 @@ import { FilesetResolver, ImageClassifier, ImageSegmenter, ImageSegmenterResult,
 			return;
 		}
 		$scannButton?.classList.add('btn-disabled')
-		console.log($imgPreview)
+		$imgPreview?.classList.add('hidden')
+		$skeleton?.classList.remove('hidden')
 		// imageSegmenter.segment($imgPreview, callback);
 		const detections = objectDetector.detect($imgPreview);
   		displayImageDetections(detections);
 	}
 
 	const displayImageDetections = ( result: ObjectDetectorResult) => {
-
+		let percentStr = '';
 		result.detections.forEach((d) => {
 			let percent = Math.round(parseFloat(d.categories[0].score.toString()) * 100)
-			$progress.innerHTML += `<div class="flex items-center flex-col gap-2"><div class="radial-progress" style="--value:${percent};" role="progressbar">${percent}%</div><div>${d.categories[0].categoryName}</div></div>`
+			percentStr += `<div class="flex items-center flex-col gap-2"><div class="radial-progress" style="--value:${percent};" role="progressbar">${percent}%</div><div>${d.categories[0].categoryName}</div></div>`
 		})
-
+		$progress.innerHTML = percentStr;
+		$skeleton?.classList.add('hidden')
+		$imgPreview?.classList.remove('hidden')
 		$scannButton.classList.remove('btn-disabled');
 
 	}
