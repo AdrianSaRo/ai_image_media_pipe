@@ -83,7 +83,7 @@ import { FilesetResolver, ImageClassifier, ImageSegmenter, ImageSegmenterResult,
 			$progress.innerHTML += `<div class="flex items-center flex-col gap-2"><div class="radial-progress" style="--value:${percent};" role="progressbar">${percent}%</div><div>${d.categories[0].categoryName}</div></div>`
 		})
 
-		$scannButton.classList.remove('hidden');
+		$scannButton.classList.remove('btn-disabled');
 
 	}
 
